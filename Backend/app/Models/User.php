@@ -45,4 +45,13 @@ class User extends Authenticatable
             'password' => 'hashed',
         ];
     }
+
+    /**
+     * Relasi: User ini memiliki banyak Buku.
+     * INI ADALAH KODE YANG PERLU ANDA TAMBAHKAN
+     */
+    public function books()
+    {
+        return $this->hasMany(Book::class);
+    }
 }
