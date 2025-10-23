@@ -6,11 +6,13 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Laravel\Sanctum\HasApiTokens; // <-- TAMBAHKAN BARIS INI
 
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable;
+    // TAMBAHKAN HasApiTokens DI SINI vvvvvvvvvvvvvv
+    use HasApiTokens, HasFactory, Notifiable;
 
     /**
      * The attributes that are mass assignable.
@@ -48,10 +50,10 @@ class User extends Authenticatable
 
     /**
      * Relasi: User ini memiliki banyak Buku.
-     * INI ADALAH KODE YANG PERLU ANDA TAMBAHKAN
      */
     public function books()
     {
         return $this->hasMany(Book::class);
     }
 }
+
