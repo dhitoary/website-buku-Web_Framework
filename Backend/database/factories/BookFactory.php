@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Models\Publisher; // <-- Tambahkan ini
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -17,25 +18,21 @@ class BookFactory extends Factory
     public function definition(): array
     {
         return [
-            // Kolom 'user_id' akan kita tentukan saat memanggil factory nanti.
-            
-            // faker->sentence(3) akan membuat judul acak dari 3 kata.
-            'title' => $this->faker->sentence(3),
-            
-            // faker->name() akan menghasilkan nama orang acak.
-            'author' => $this->faker->name(),
-            
-            // faker->company() akan menghasilkan nama perusahaan acak.
-            'publisher' => $this->faker->company(),
-            
-            // faker->year() akan menghasilkan tahun acak.
+            // Ini akan mengambil ID dari Publisher yang sudah ada
+            'publisher_id' => Publisher::factory(), 
+
+            'title' => $this->faker->sentence(4),
+            'isbn' => $this->faker->unique()->isbn13(),
+            'description' => $this->faker->paragraph(3),
+
+            // Harga antara 50rb - 300rb
+            'price' => $this->faker->numberBetween(50000, 300000), 
+            'stock' => $this->faker->numberBetween(0, 100),
+
+            // 'cover_image' sudah ada di migrasi Anda
+            'cover_image' => $this->faker->imageUrl(480, 640, 'book', true),
+
             'year_published' => $this->faker->year(),
-            
-            // faker->paragraph(2) akan membuat deskripsi acak dari 2 paragraf.
-            'description' => $this->faker->paragraph(2),
-            
-            // faker->imageUrl(...) akan menghasilkan link URL ke sebuah gambar acak.
-            'cover_image_url' => $this->faker->imageUrl(480, 640, 'book', true),
         ];
     }
 }

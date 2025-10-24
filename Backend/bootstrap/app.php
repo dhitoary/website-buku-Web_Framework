@@ -3,6 +3,7 @@
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\Request; 
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -12,23 +13,27 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
-        
-        // Ini adalah kode Anda yang sudah ada untuk 'admin'. JANGAN DIHAPUS.
+
+        // Pengaturan 'admin' Anda yang sudah ada
         $middleware->alias([
             'admin' => \App\Http\Middleware\IsAdmin::class,
-            // Kamu bisa tambahkan alias lain di sini
-            // 'auth' => ... (biasanya sudah ada by default)
         ]);
 
-        // --- TAMBAHKAN 2 BLOK INI ---
-        // Kita tambahkan pengaturan API di bawah alias Anda.
-        
+        // Pengaturan CSRF Anda yang sudah ada
         $middleware->validateCsrfTokens(except: [
-            'api/*', // Izinkan rute API tanpa token CSRF
+            'api/*',
         ]);
 
-        $middleware->statefulApi(); // KUNCI untuk login dari React
-        // -----------------------------
+        // Pengaturan Sanctum Anda yang sudah ada
+        $middleware->statefulApi(); 
+
+        // --- TAMBAHAN KRUSIAL UNTUK FIX CORS ---
+        // Ini memberitahu Laravel untuk menjalankan middleware CORS
+        // (yang aturannya kita buat di cors.php) untuk semua rute 'api/*'
+        $middleware->api(prepend: [
+            \Illuminate\Http\Middleware\HandleCors::class,
+        ]);
+        // ----------------------------------------
 
     })
     ->withExceptions(function (Exceptions $exceptions) {
