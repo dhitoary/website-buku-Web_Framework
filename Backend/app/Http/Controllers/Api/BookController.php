@@ -1,142 +1,152 @@
 <?php
+// File: Backend/app/Http/Controllers/Api/BookController.php
 
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Book;
+use App\Http\Resources\BookResource; // <-- 1. Import Resource kita
+use App\Models\Book; // <-- Import Model
 use Illuminate\Http\Request;
-// Tambahkan ini untuk validasi
-use Illuminate\Support\Facades\Validator;
-// Tambahkan ini untuk mendapatkan user yang login
-use Illuminate\Support\Facades\Auth;
-// Tambahkan ini untuk response error otorisasi
-use Illuminate\Auth\Access\AuthorizationException;
-
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection; // Untuk koleksi
 
 class BookController extends Controller
 {
     /**
-     * Menampilkan daftar semua buku dengan pagination.
+     * Display a listing of the resource.
+     * GET /api/books
+     *
+     * Mengembalikan daftar semua buku (dengan paginasi).
      */
-    public function index()
+    public function index(): AnonymousResourceCollection // <-- 2. Tipe return adalah Resource Collection
     {
-        // Ambil buku, urutkan dari terbaru, paginasi 10 per halaman
-        $books = Book::latest()->paginate(10);
-        return response()->json($books);
+        // 3. Eager Loading Relasi (PENTING untuk performa N+1)
+        // Kita beritahu Eloquent untuk mengambil relasi ini sekaligus
+        $books = Book::with(['publisher', 'authors', 'categories'])
+                    ->paginate(15); // Misalnya, 15 buku per halaman
+
+        // 4. Gunakan Resource Collection untuk membungkus data
+        // Ini akan otomatis memanggil BookResource::toArray()
+        // untuk setiap buku dalam koleksi.
+        return BookResource::collection($books);
     }
 
     /**
-     * Menyimpan buku baru ke database.
+     * Store a newly created resource in storage.
+     * POST /api/admin/books (Contoh untuk Admin)
      */
-    public function store(Request $request)
+    public function store(Request $request): BookResource // <-- 5. Return Resource tunggal
     {
-        // 1. Validasi Input dari request
-        $validator = Validator::make($request->all(), [
+        // (Pastikan rute ini dilindungi oleh middleware 'admin')
+        $validated = $request->validate([
             'title' => 'required|string|max:255',
-            'author' => 'required|string|max:255',
-            'publisher' => 'required|string|max:255',
-            'year_published' => 'required|integer|digits:4',
+            'publisher_id' => 'nullable|exists:publishers,id',
+            'isbn' => 'nullable|string|unique:books,isbn',
             'description' => 'nullable|string',
-            'cover_image_url' => 'nullable|url', // Memastikan format URL benar
-        ]);
-
-        // Jika validasi gagal, kembalikan response error
-        if ($validator->fails()) {
-            return response()->json($validator->errors(), 422); // 422 Unprocessable Entity
-        }
-
-        // 2. Dapatkan user yang sedang login via token Sanctum
-        $user = Auth::user(); // Atau bisa juga $request->user() jika middleware sudah aktif
-        if (!$user) {
-             // Jika tidak ada user login (token tidak valid/tidak ada)
-             return response()->json(['message' => 'Unauthenticated.'], 401); // 401 Unauthorized
-        }
-
-        // 3. Buat buku baru dan otomatis hubungkan dengan user yang login
-        // $validator->validated() hanya mengambil data yang sudah lolos validasi
-        $book = $user->books()->create($validator->validated());
-
-        // 4. Kembalikan response sukses
-        return response()->json([
-            'message' => 'Book created successfully',
-            'book' => $book // Kirim data buku yang baru dibuat
-        ], 201); // 201 Created
-    }
-
-    /**
-     * Menampilkan satu buku spesifik berdasarkan ID-nya.
-     */
-    public function show(Book $book)
-    {
-        // Laravel's Route Model Binding otomatis menemukan buku berdasarkan ID
-        return response()->json($book);
-    }
-
-    /**
-     * Mengupdate buku yang ada.
-     */
-    public function update(Request $request, Book $book)
-    {
-        // 1. Dapatkan user yang sedang login
-        $user = Auth::user();
-         if (!$user) {
-             return response()->json(['message' => 'Unauthenticated.'], 401);
-         }
-
-        // 2. Cek Otorisasi (Apakah user ini pemilik buku?)
-        if ($user->id !== $book->user_id) {
-             // Jika bukan pemilik, lempar error 403 Forbidden
-             throw new AuthorizationException('You do not own this book.');
-             // Atau bisa juga: return response()->json(['message' => 'Forbidden. You do not own this book.'], 403);
-        }
-
-        // 3. Validasi input (mirip store, tapi tidak semua wajib)
-        $validator = Validator::make($request->all(), [
-            'title' => 'sometimes|required|string|max:255', // 'sometimes' berarti hanya validasi jika ada di request
-            'author' => 'sometimes|required|string|max:255',
-            'publisher' => 'sometimes|required|string|max:255',
-            'year_published' => 'sometimes|required|integer|digits:4',
-            'description' => 'nullable|string',
+            'page_count' => 'nullable|integer|min:0',
+            'published_year' => 'nullable|integer',
+            'price' => 'required|numeric|min:0',
+            'stock' => 'required|integer|min:0',
             'cover_image_url' => 'nullable|url',
+            // Validasi untuk relasi Many-to-Many (authors, categories)
+            'author_ids' => 'nullable|array',
+            'author_ids.*' => 'integer|exists:authors,id', // Pastikan setiap ID ada
+            'category_ids' => 'nullable|array',
+            'category_ids.*' => 'integer|exists:categories,id',
         ]);
 
-        if ($validator->fails()) {
-            return response()->json($validator->errors(), 422);
-        }
+        // Gunakan transaksi jika membuat buku dan relasinya
+        $book = DB::transaction(function () use ($validated) {
+            $newBook = Book::create($validated);
 
-        // 4. Update data buku
-        $book->update($validator->validated());
+            // Lampirkan relasi N-N (jika ada)
+            if (!empty($validated['author_ids'])) {
+                $newBook->authors()->sync($validated['author_ids']);
+            }
+            if (!empty($validated['category_ids'])) {
+                $newBook->categories()->sync($validated['category_ids']);
+            }
+            return $newBook;
+        });
 
-        // 5. Kembalikan response sukses dengan data buku yang sudah diupdate
-        return response()->json([
-            'message' => 'Book updated successfully',
-            'book' => $book
-        ]);
+
+        // 6. Kembalikan buku yang baru dibuat melalui Resource
+        // Kita perlu load relasi lagi agar ditampilkan di response
+        $book->load(['publisher', 'authors', 'categories']);
+        return BookResource::make($book);
     }
 
     /**
-     * Menghapus buku.
+     * Display the specified resource.
+     * GET /api/books/{id}
      */
-    public function destroy(Book $book)
+    public function show(string $id): BookResource // <-- 7. Tipe return adalah Resource tunggal
     {
-        // 1. Dapatkan user yang sedang login
-        $user = Auth::user();
-         if (!$user) {
-             return response()->json(['message' => 'Unauthenticated.'], 401);
-         }
+        // 8. Eager load relasi
+        $book = Book::with(['publisher', 'authors', 'categories'])
+                    ->findOrFail($id); // findOrFail akan otomatis 404 jika tidak ketemu
 
-        // 2. Cek Otorisasi (Apakah user ini pemilik buku?)
-        if ($user->id !== $book->user_id) {
-            throw new AuthorizationException('You do not own this book.');
-             // Atau: return response()->json(['message' => 'Forbidden. You do not own this book.'], 403);
-        }
+        // 9. Kembalikan data melalui Resource
+        return BookResource::make($book);
+    }
 
-        // 3. Hapus buku
+    /**
+     * Update the specified resource in storage.
+     * PUT /api/admin/books/{id} (Contoh untuk Admin)
+     */
+    public function update(Request $request, string $id): BookResource
+    {
+        // (Pastikan rute ini dilindungi oleh middleware 'admin')
+        $book = Book::findOrFail($id);
+
+        $validated = $request->validate([
+            'title' => 'sometimes|required|string|max:255',
+            'publisher_id' => 'sometimes|nullable|exists:publishers,id',
+            // Unique rule harus mengabaikan ID buku saat ini
+            'isbn' => 'sometimes|nullable|string|unique:books,isbn,' . $book->id,
+            'description' => 'sometimes|nullable|string',
+            'page_count' => 'sometimes|nullable|integer|min:0',
+            'published_year' => 'sometimes|nullable|integer',
+            'price' => 'sometimes|required|numeric|min:0',
+            'stock' => 'sometimes|required|integer|min:0',
+            'cover_image_url' => 'sometimes|nullable|url',
+            'author_ids' => 'sometimes|nullable|array',
+            'author_ids.*' => 'integer|exists:authors,id',
+            'category_ids' => 'sometimes|nullable|array',
+            'category_ids.*' => 'integer|exists:categories,id',
+        ]);
+
+        DB::transaction(function () use ($book, $validated) {
+            $book->update($validated);
+
+            // Update relasi N-N (gunakan sync agar relasi lama terhapus)
+            if ($request->has('author_ids')) { // Cek apakah array dikirim
+                $book->authors()->sync($validated['author_ids'] ?? []); // Sync dengan array kosong jika null
+            }
+            if ($request->has('category_ids')) {
+                $book->categories()->sync($validated['category_ids'] ?? []);
+            }
+        });
+
+
+        // Kembalikan data buku yang sudah diupdate
+        $book->load(['publisher', 'authors', 'categories']);
+        return BookResource::make($book);
+    }
+
+    /**
+     * Remove the specified resource from storage.
+     * DELETE /api/admin/books/{id} (Contoh untuk Admin)
+     */
+    public function destroy(string $id): Response // <-- 10. Tipe return Response (biasanya 204 No Content)
+    {
+        // (Pastikan rute ini dilindungi oleh middleware 'admin')
+        $book = Book::findOrFail($id);
+        
+        // Soft delete akan otomatis digunakan karena model Book
+        // menggunakan trait SoftDeletes
         $book->delete();
 
-        // 4. Kembalikan response sukses (biasanya 204 No Content untuk delete)
-        return response()->json(['message' => 'Book deleted successfully'], 200);
-        // Atau: return response()->noContent(); // Standar REST API untuk delete sukses
+        // 11. Kembalikan response 204 (No Content)
+        return response()->noContent();
     }
 }
-

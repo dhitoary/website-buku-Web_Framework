@@ -1,34 +1,34 @@
 <?php
+// File: Backend/app/Models/User.php
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
+// Gunakan ini untuk menggantikan App\Models\User yang lama
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes; // <-- 1. Tambahkan SoftDeletes
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Laravel\Sanctum\HasApiTokens; // <-- TAMBAHKAN BARIS INI
+use Laravel\Sanctum\HasApiTokens; // <-- 2. Tambahkan HasApiTokens untuk API
 
 class User extends Authenticatable
 {
-    /** @use HasFactory<\Database\Factories\UserFactory> */
-    // TAMBAHKAN HasApiTokens DI SINI vvvvvvvvvvvvvv
-    use HasApiTokens, HasFactory, Notifiable;
+    use HasFactory, Notifiable, SoftDeletes, HasApiTokens; // <-- 3. Gunakan traits
 
     /**
-     * The attributes that are mass assignable.
-     *
-     * @var list<string>
+     * Kolom yang boleh diisi secara massal.
+     * Kita tambahkan 'full_name' dan 'role' (meskipun 'role' harus hati-hati).
      */
     protected $fillable = [
-        'name',
+        'full_name', // <-- 4. Ganti 'name' menjadi 'full_name'
         'email',
         'password',
+        'role', // <-- 5. Tambahkan 'role'
+        'profile_image_url', // <-- 6. Tambahkan 'profile_image_url'
     ];
 
     /**
-     * The attributes that should be hidden for serialization.
-     *
-     * @var list<string>
+     * Kolom yang harus disembunyikan saat di-serialize (cth: jadi JSON).
      */
     protected $hidden = [
         'password',
@@ -36,24 +36,38 @@ class User extends Authenticatable
     ];
 
     /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
+     * Kolom yang harus di-cast ke tipe data tertentu.
      */
-    protected function casts(): array
+    protected $casts = [
+        'email_verified_at' => 'datetime',
+        'password' => 'hashed', // <-- 7. Pastikan password otomatis di-hash
+    ];
+
+    // =================================================================
+    // RELASI ELOQUENT
+    // =================================================================
+
+    /**
+     * Relasi 1-N: Satu User memiliki banyak Alamat
+     */
+    public function addresses(): HasMany
     {
-        return [
-            'email_verified_at' => 'datetime',
-            'password' => 'hashed',
-        ];
+        return $this->hasMany(UserAddress::class, 'user_id', 'id');
     }
 
     /**
-     * Relasi: User ini memiliki banyak Buku.
+     * Relasi 1-N: Satu User memiliki banyak Pesanan
      */
-    public function books()
+    public function orders(): HasMany
     {
-        return $this->hasMany(Book::class);
+        return $this->hasMany(Order::class, 'user_id', 'id');
+    }
+
+    /**
+     * Relasi 1-1: Satu User memiliki satu Keranjang
+     */
+    public function cart()
+    {
+        return $this->hasOne(Cart::class, 'user_id', 'id');
     }
 }
-

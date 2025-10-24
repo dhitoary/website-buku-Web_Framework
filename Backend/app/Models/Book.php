@@ -1,34 +1,71 @@
 <?php
+// File: Backend/app/Models/Book.php
 
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\SoftDeletes; // <-- 1. Tambahkan SoftDeletes
 
 class Book extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes; // <-- 2. Gunakan traits
 
     /**
-     * Kolom-kolom yang boleh diisi secara massal (mass assignable).
-     * Ini adalah praktik keamanan untuk mencegah pengisian data yang tidak diinginkan.
+     * Kolom yang boleh diisi secara massal.
+     * Kita ganti dari yang lama, sesuaikan dengan migrasi baru.
      */
     protected $fillable = [
-        'user_id',
+        'publisher_id', // <-- 3. Ganti user_id
         'title',
-        'author',
-        'publisher',
-        'year_published',
+        'isbn',
         'description',
+        'page_count',
+        'published_year',
+        'price', // <-- 4. Tambahkan price
+        'stock', // <-- 5. Tambahkan stock
         'cover_image_url',
     ];
 
     /**
-     * Mendefinisikan relasi ke model User.
-     * 'belongsTo' berarti "buku ini dimiliki oleh" satu User.
+     * Kolom yang harus di-cast.
      */
-    public function user()
+    protected $casts = [
+        'price' => 'decimal:2',
+        'page_count' => 'integer',
+        'published_year' => 'integer',
+        'stock' => 'integer',
+    ];
+
+    // =================================================================
+    // RELASI ELOQUENT
+    // =================================================================
+
+    /**
+     * Relasi N-1: Satu Buku dimiliki oleh satu Penerbit
+     */
+    public function publisher(): BelongsTo
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(Publisher::class, 'publisher_id', 'id');
+    }
+
+    /**
+     * Relasi N-N: Satu Buku bisa ditulis banyak Penulis
+     */
+    public function authors(): BelongsToMany
+    {
+        // 'book_author' adalah nama tabel junction kita
+        return $this->belongsToMany(Author::class, 'book_author', 'book_id', 'author_id');
+    }
+
+    /**
+     * Relasi N-N: Satu Buku bisa memiliki banyak Kategori
+     */
+    public function categories(): BelongsToMany
+    {
+        // 'book_category' adalah nama tabel junction kita
+        return $this->belongsToMany(Category::class, 'book_category', 'book_id', 'category_id');
     }
 }
