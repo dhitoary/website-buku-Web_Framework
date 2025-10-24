@@ -9,7 +9,8 @@ use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CartController;
 use App\Http\Controllers\Api\UserAddressController;
-use App\Http\Controllers\Api\CheckoutController; // <-- Import Checkout
+use App\Http\Controllers\Api\CheckoutController;
+use App\Http\Controllers\Api\OrderController; // <-- 1. TAMBAHKAN IMPORT INI
 
 /*
 |--------------------------------------------------------------------------
@@ -27,9 +28,8 @@ Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
 
 // --- RUTE TERPROTEKSI (Butuh Login) ---
-// INI ADALAH BARIS YANG DIPERBAIKI (TANPA TITIK)
 Route::middleware('auth:sanctum')->group(function () {
-    
+
     // Rute Auth yg terproteksi
     Route::get('/user', [AuthController::class, 'user']);
     Route::post('/logout', [AuthController::class, 'logout']);
@@ -39,7 +39,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/cart/items', [CartController::class, 'store']); 
     Route::put('/cart/items/{itemId}', [CartController::class, 'update']); 
     Route::delete('/cart/items/{itemId}', [CartController::class, 'destroy']);
-    
+
     // Rute Alamat
     Route::get('/addresses', [UserAddressController::class, 'index']); 
     Route::post('/addresses', [UserAddressController::class, 'store']); 
@@ -48,4 +48,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Rute Checkout
     Route::post('/checkout', [CheckoutController::class, 'store']);
+
+    // --- RUTE RIWAYAT PESANAN (BARU) ---
+    Route::get('/orders', [OrderController::class, 'index']); // <-- 2. TAMBAHKAN INI
+    Route::get('/orders/{id}', [OrderController::class, 'show']); // <-- 3. TAMBAHKAN INI
 });

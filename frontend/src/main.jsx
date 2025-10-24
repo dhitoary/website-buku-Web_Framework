@@ -17,7 +17,9 @@ import RegisterPage from './pages/RegisterPage.jsx';
 import BookDetailPage from './pages/BookDetailPage.jsx'; 
 import CartPage from './pages/CartPage.jsx';
 import ProfilePage from './pages/ProfilePage.jsx';
-import CheckoutPage from './pages/CheckoutPage.jsx'; // <-- BARU
+import CheckoutPage from './pages/CheckoutPage.jsx';
+import OrderHistoryPage from './pages/OrderHistoryPage.jsx'; // <-- BARU: Impor Halaman Daftar Riwayat
+import OrderDetailPage from './pages/OrderDetailPage.jsx'; // <-- BARU: Impor Halaman Detail Riwayat
 
 // Definisikan Rute/Halaman kita
 const router = createBrowserRouter([
@@ -47,11 +49,24 @@ const router = createBrowserRouter([
       },
       {
         path: '/profile',
-        element: <ProfilePage />,
+        element: <ProfilePage />, 
+        // BARU: Kita buat sub-rute untuk Riwayat Pesanan di dalam Profile
+        // Ini akan membuat URL menjadi /profile/orders
+        children: [
+          {
+            path: 'orders', // <-- Path relatif terhadap /profile
+            element: <OrderHistoryPage />,
+          }
+        ]
       },
       {
-        path: '/checkout', // <-- BARU
+        path: '/checkout',
         element: <CheckoutPage />,
+      },
+      // Rute untuk Detail Pesanan (bisa diakses langsung)
+      {
+        path: '/order/:id', // <-- BARU: Rute Detail Pesanan
+        element: <OrderDetailPage />,
       },
     ],
   },
