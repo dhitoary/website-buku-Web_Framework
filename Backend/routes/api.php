@@ -1,51 +1,64 @@
 <?php
+// File: Backend/routes/api.php
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+
+// Import Controller
+use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BookController;
-use App\Http\Controllers\Api\AuthController; // Pastikan ini di-import
+use App\Http\Controllers\Api\CheckoutController;
+// use App\Http\Controllers\Api\Admin\AdminOrderController; // Untuk nanti
 
-/*
-|--------------------------------------------------------------------------
-| API Routes
-|--------------------------------------------------------------------------
-|
-| Here is where you can register API routes for your application. These
-| routes are loaded by the RouteServiceProvider and all of them will
-| be assigned to the "api" middleware group. Make something great!
-|
-*/
 
-// Rute Publik (tidak perlu login)
-Route::post('/register', [AuthController::class, 'register'])->name('register'); // Memberi nama rute (opsional)
-Route::post('/login', [AuthController::class, 'login'])->name('login');
-Route::get('/books', [BookController::class, 'index'])->name('books.index');
-Route::get('/books/{book}', [BookController::class, 'show'])->name('books.show');
+// =================================================================
+// RUTE PUBLIK
+// =================================================================
+// Buku (Read-Only)
+Route::get('/books', [BookController::class, 'index']); // Daftar buku (paginasi)
+Route::get('/books/{id}', [BookController::class, 'show']); // Detail buku
 
-// Grup Rute yang Membutuhkan Login (Dilindungi 'auth:sanctum')
+// Autentikasi
+Route::post('/register', [AuthController::class, 'register']);
+Route::post('/login', [AuthController::class, 'login']);
+
+
+// =================================================================
+// RUTE USER (Perlu Login - auth:sanctum)
+// =================================================================
 Route::middleware('auth:sanctum')->group(function () {
+    
+    // Logout
+    Route::post('/logout', [AuthController::class, 'logout']);
+    
+    // Checkout
+    Route::post('/checkout', [CheckoutController::class, 'store']);
 
-    // Rute untuk mendapatkan data user yang login saat ini
-    Route::get('/user', function (Request $request) {
-        return $request->user();
-    })->name('user');
+    // (Rute lain untuk user: cart, my-orders, my-profile, dll.)
 
-    // Rute Logout
-    Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
-
-    // Rute CRUD Buku yang dilindungi
-    // Kita gunakan apiResource untuk cara yang lebih singkat
-    // Ini otomatis membuat rute untuk store, update, destroy
-    // Route::post('/books', [BookController::class, 'store']); // Sudah dicakup apiResource
-    // Route::put('/books/{book}', [BookController::class, 'update']); // Sudah dicakup apiResource
-    // Route::delete('/books/{book}', [BookController::class, 'destroy']); // Sudah dicakup apiResource
-
-    // Cara lebih singkat:
-    Route::apiResource('books', BookController::class)->except(['index', 'show']); // Kecualikan index & show karena sudah publik
-
-    // Jika Anda lebih suka menulis satu per satu (seperti di atas, juga boleh):
-    // Route::post('/books', [BookController::class, 'store'])->name('books.store');
-    // Route::put('/books/{book}', [BookController::class, 'update'])->name('books.update'); // PUT atau PATCH
-    // Route::delete('/books/{book}', [BookController::class, 'destroy'])->name('books.destroy');
 });
 
+
+// =================================================================
+// RUTE ADMIN (Perlu Login & Role Admin - ['auth:sanctum', 'admin'])
+// =================================================================
+Route::middleware(['auth:sanctum', 'admin'])
+    ->prefix('admin') // URL prefix /api/admin/...
+    ->group(function () {
+
+    // CRUD Buku Lengkap
+    Route::post('/books', [BookController::class, 'store']);    // Create
+    // (Read sudah ada di publik, tapi bisa juga ditambahkan di sini jika perlu)
+    Route::put('/books/{id}', [BookController::class, 'update']);     // Update (PUT atau PATCH)
+    Route::delete('/books/{id}', [BookController::class, 'destroy']); // Delete (Soft Delete)
+
+    // (Rute lain untuk admin: CRUD authors, publishers, categories, manage orders, dashboard, dll.)
+    
+    // Rute Tes Keamanan
+    Route::get('/test', function (Request $request) {
+        return response()->json([
+            'message' => 'Selamat datang, Admin!',
+            'user' => $request->user(),
+        ]);
+    });
+});
